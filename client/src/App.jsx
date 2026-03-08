@@ -1,73 +1,92 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import './App.css'
 import DuplicateManager from './page/DuplicateManager'
-
-const API_BASE = import.meta.env.DEV ? 'http://localhost:5000' : ''
+import { isFileSystemAccessSupported, pickDirectory, scanForDuplicates, deleteFiles } from './utils/fileScanner'
 
 function App() {
-  const [folderPath, setFolderPath] = useState('')
   const [duplicateGroups, setDuplicateGroups] = useState([])
   const [totalImages, setTotalImages] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [scanned, setScanned] = useState(false)
+  const [folderName, setFolderName] = useState('')
+  const [progress, setProgress] = useState(null)
+  const dirHandleRef = useRef(null)
 
-  const handleScan = async () => {
-    if (!folderPath.trim()) {
-      setError('Please enter a folder path')
-      return
-    }
+  const isSupported = isFileSystemAccessSupported()
 
-    setLoading(true)
+  const handleSelectAndScan = async () => {
     setError('')
-    setScanned(false)
+    setProgress(null)
 
     try {
-      const response = await fetch(`${API_BASE}/api/scan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folderPath: folderPath.trim() }),
+      const dirHandle = await pickDirectory()
+      if (!dirHandle) return // user cancelled
+
+      dirHandleRef.current = dirHandle
+      setFolderName(dirHandle.name)
+      setLoading(true)
+      setScanned(false)
+
+      const result = await scanForDuplicates(dirHandle, (p) => {
+        setProgress(p)
       })
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to scan folder')
-      }
-
-      setDuplicateGroups(data.duplicateGroups)
-      setTotalImages(data.totalImages)
+      setDuplicateGroups(result.duplicateGroups)
+      setTotalImages(result.totalImages)
       setScanned(true)
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
+      setProgress(null)
     }
   }
 
-  const handleDelete = async (selectedFiles) => {
+  const handleRescan = async () => {
+    if (!dirHandleRef.current) return
+    setLoading(true)
+    setError('')
+    setScanned(false)
+    setProgress(null)
+
     try {
-      const response = await fetch(`${API_BASE}/api/delete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ files: selectedFiles }),
+      const result = await scanForDuplicates(dirHandleRef.current, (p) => {
+        setProgress(p)
       })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to delete files')
-      }
-
-      if (data.deleted.length > 0) {
-        handleScan()
-      }
-
-      return data
+      setDuplicateGroups(result.duplicateGroups)
+      setTotalImages(result.totalImages)
+      setScanned(true)
     } catch (err) {
       setError(err.message)
-      throw err
+    } finally {
+      setLoading(false)
+      setProgress(null)
     }
+  }
+
+  const handleDelete = async (selectedFilePaths) => {
+    // Build file entries from duplicate groups matching paths
+    const filesToDelete = []
+    for (const group of duplicateGroups) {
+      for (const sample of group.samples) {
+        if (selectedFilePaths.includes(sample.path)) {
+          filesToDelete.push(sample)
+        }
+      }
+    }
+
+    const result = await deleteFiles(filesToDelete)
+
+    if (result.errors.length > 0) {
+      setError(`Failed to delete ${result.errors.length} file(s): ${result.errors[0].error}`)
+    }
+
+    if (result.deleted.length > 0) {
+      await handleRescan()
+    }
+
+    return result
   }
 
   return (
@@ -92,7 +111,7 @@ function App() {
               <span className="gradient-text">DupliCleaner</span>
             </h1>
           </div>
-          <a href="https://github.com" target="_blank" rel="noopener noreferrer"
+          <a href="https://github.com/tharindu009/imageDuplicate" target="_blank" rel="noopener noreferrer"
             className="text-zinc-500 hover:text-violet-400 transition-colors">
             <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
@@ -118,98 +137,74 @@ function App() {
             </h1>
 
             <p className="text-zinc-400 text-lg leading-relaxed max-w-xl mx-auto" style={{ marginBottom: '56px' }}>
-              Scan any folder, compare duplicates side-by-side, and reclaim your storage. Fast, private, and runs locally.
+              Scan any folder, compare duplicates side-by-side, and reclaim your storage. Fast, private, and runs entirely in your browser.
             </p>
 
-            {/* Search Input */}
+            {/* Select Folder Button */}
             <div className="w-full max-w-2xl mx-auto">
-              <div className="relative" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {/* Input Field */}
-                <div className="relative">
-                  <svg className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-                  </svg>
-                  <input
-                    type="text"
-                    value={folderPath}
-                    onChange={(e) => setFolderPath(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleScan()}
-                    placeholder="Enter folder path  (e.g. /Users/you/Pictures)"
+              {isSupported ? (
+                <div className="relative" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <button
+                    onClick={handleSelectAndScan}
+                    disabled={loading}
                     style={{
                       width: '100%',
-                      padding: '18px 24px 18px 52px',
-                      background: 'rgba(255,255,255,0.04)',
-                      border: '1.5px solid rgba(139, 92, 246, 0.25)',
+                      padding: '20px 32px',
+                      background: 'linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)',
+                      border: 'none',
                       borderRadius: '16px',
                       color: '#fff',
-                      fontSize: '15px',
-                      outline: 'none',
-                      transition: 'border-color 0.2s, box-shadow 0.2s',
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '12px',
+                      transition: 'all 0.3s ease',
+                      boxShadow: '0 4px 20px rgba(124, 58, 237, 0.3)',
+                      letterSpacing: '0.02em',
                     }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = 'rgba(139, 92, 246, 0.6)';
-                      e.target.style.boxShadow = '0 0 0 4px rgba(139, 92, 246, 0.1), 0 4px 20px rgba(139, 92, 246, 0.15)';
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 8px 30px rgba(124, 58, 237, 0.45)';
                     }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = 'rgba(139, 92, 246, 0.25)';
-                      e.target.style.boxShadow = 'none';
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 20px rgba(124, 58, 237, 0.3)';
                     }}
-                    disabled={loading}
-                  />
-                </div>
+                  >
+                    <svg style={{ height: '20px', width: '20px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                    </svg>
+                    Select Folder & Scan
+                  </button>
 
-                {/* Scan Button */}
-                <button
-                  onClick={handleScan}
-                  disabled={loading}
-                  style={{
-                    width: '100%',
-                    padding: '16px 32px',
-                    background: 'linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)',
-                    border: 'none',
-                    borderRadius: '14px',
-                    color: '#fff',
-                    fontSize: '15px',
-                    fontWeight: 600,
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    opacity: loading ? 0.5 : 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '10px',
-                    transition: 'all 0.3s ease',
-                    boxShadow: '0 4px 20px rgba(124, 58, 237, 0.3)',
-                    letterSpacing: '0.02em',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!loading) {
-                      e.target.style.transform = 'translateY(-2px)';
-                      e.target.style.boxShadow = '0 8px 30px rgba(124, 58, 237, 0.45)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.transform = 'translateY(0)';
-                    e.target.style.boxShadow = '0 4px 20px rgba(124, 58, 237, 0.3)';
-                  }}
-                >
-                  {loading ? (
-                    <>
-                      <svg className="animate-spin" style={{ height: '18px', width: '18px' }} viewBox="0 0 24 24">
-                        <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                      Scanning...
-                    </>
-                  ) : (
-                    <>
-                      <svg style={{ height: '18px', width: '18px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                      Scan for Duplicates
-                    </>
-                  )}
-                </button>
-              </div>
+                  <p className="text-zinc-600 text-sm text-center">
+                    Your browser will ask you to pick a folder — no files are uploaded anywhere
+                  </p>
+                </div>
+              ) : (
+                /* Unsupported browser fallback */
+                <div style={{
+                  padding: '24px',
+                  background: 'rgba(234, 179, 8, 0.08)',
+                  border: '1.5px solid rgba(234, 179, 8, 0.2)',
+                  borderRadius: '16px',
+                  textAlign: 'center',
+                }}>
+                  <svg style={{ height: '32px', width: '32px', margin: '0 auto 12px', color: '#eab308' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                  </svg>
+                  <p style={{ color: '#eab308', fontWeight: 600, fontSize: '15px', marginBottom: '8px' }}>
+                    Browser Not Supported
+                  </p>
+                  <p style={{ color: '#a1a1aa', fontSize: '14px', lineHeight: 1.6 }}>
+                    The File System Access API is required for client-side scanning.<br />
+                    Please use <strong style={{ color: '#fff' }}>Google Chrome</strong>, <strong style={{ color: '#fff' }}>Microsoft Edge</strong>, or <strong style={{ color: '#fff' }}>Opera</strong>.
+                  </p>
+                </div>
+              )}
 
               {/* Error */}
               {error && (
@@ -242,36 +237,30 @@ function App() {
                 <svg className="h-4 w-4 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
-                Recursive Scanning
+                No Upload Required
               </div>
             </div>
           </div>
         </div>
       ) : (
         <>
-          {/* Compact Search Bar (when scanning/scanned) */}
+          {/* Compact Top Bar (when scanning/scanned) */}
           <div className="sticky top-[52px] z-20 glass-dark border-b border-white/5">
-            <div className="max-w-7xl mx-auto px-6 py-3">
+            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '12px 32px' }}>
               <div className="flex items-center gap-3">
-                <div className="flex-1 relative">
-                  <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                {/* Folder info */}
+                <div className="flex items-center gap-2 flex-1">
+                  <svg className="h-4 w-4 text-violet-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
                   </svg>
-                  <input
-                    type="text"
-                    value={folderPath}
-                    onChange={(e) => setFolderPath(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleScan()}
-                    placeholder="Enter folder path..."
-                    className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 text-white placeholder-zinc-600
-                               text-sm rounded-xl focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 transition"
-                    disabled={loading}
-                  />
+                  <span className="text-sm text-zinc-300 font-medium truncate">{folderName}</span>
                 </div>
+
+                {/* Action buttons */}
                 <button
-                  onClick={handleScan}
+                  onClick={handleRescan}
                   disabled={loading}
-                  className="btn-primary px-6 py-2.5 rounded-xl text-white font-semibold text-sm
+                  className="btn-primary px-5 py-2 rounded-xl text-white font-semibold text-sm
                              disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {loading ? (
@@ -285,6 +274,14 @@ function App() {
                   ) : (
                     'Re-scan'
                   )}
+                </button>
+                <button
+                  onClick={handleSelectAndScan}
+                  disabled={loading}
+                  className="text-sm text-zinc-500 hover:text-violet-400 font-medium px-4 py-2 rounded-xl
+                             hover:bg-white/5 transition disabled:opacity-40"
+                >
+                  Change Folder
                 </button>
               </div>
 
@@ -311,7 +308,7 @@ function App() {
             </div>
           </div>
 
-          {/* Loading State */}
+          {/* Loading State with Progress */}
           {loading && (
             <div className="flex flex-col items-center justify-center h-[60vh] animate-fade-in">
               <div className="relative">
@@ -322,8 +319,40 @@ function App() {
                   </svg>
                 </div>
               </div>
-              <p className="text-zinc-400 mt-6 font-medium">Scanning for duplicates...</p>
-              <p className="text-zinc-600 text-sm mt-1">This may take a moment for large folders</p>
+
+              {progress && progress.phase === 'collecting' && (
+                <>
+                  <p className="text-zinc-400 mt-6 font-medium">Discovering images...</p>
+                  <p className="text-zinc-600 text-sm mt-1">Found {progress.count} images so far</p>
+                </>
+              )}
+              {progress && progress.phase === 'hashing' && (
+                <>
+                  <p className="text-zinc-400 mt-6 font-medium">Hashing images...</p>
+                  <p className="text-zinc-600 text-sm mt-1">
+                    {progress.count} / {progress.total} — {progress.current}
+                  </p>
+                  {/* Progress bar */}
+                  <div style={{
+                    width: '240px', height: '4px', background: 'rgba(255,255,255,0.05)',
+                    borderRadius: '4px', marginTop: '16px', overflow: 'hidden',
+                  }}>
+                    <div style={{
+                      width: `${(progress.count / progress.total) * 100}%`,
+                      height: '100%',
+                      background: 'linear-gradient(90deg, #7c3aed, #6366f1)',
+                      borderRadius: '4px',
+                      transition: 'width 0.2s ease',
+                    }} />
+                  </div>
+                </>
+              )}
+              {!progress && (
+                <>
+                  <p className="text-zinc-400 mt-6 font-medium">Scanning for duplicates...</p>
+                  <p className="text-zinc-600 text-sm mt-1">This may take a moment for large folders</p>
+                </>
+              )}
             </div>
           )}
 
@@ -341,7 +370,7 @@ function App() {
       <footer className="relative z-10 border-t border-white/5 mt-auto">
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', color: '#52525b' }}>
           <span>© 2026 DupliCleaner. Built with ♥</span>
-          <span>All processing happens locally on your machine</span>
+          <span>All processing happens in your browser</span>
         </div>
       </footer>
     </div>

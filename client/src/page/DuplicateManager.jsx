@@ -1,11 +1,22 @@
-import React, { useState } from 'react';
-
-const API_BASE = import.meta.env.DEV ? 'http://localhost:5000' : '';
+import React, { useState, useEffect } from 'react';
 
 const DuplicateManager = ({ duplicateGroups, onDelete }) => {
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [deleting, setDeleting] = useState(false);
     const [zoomedImage, setZoomedImage] = useState(null);
+
+    // Clean up blob URLs on unmount
+    useEffect(() => {
+        return () => {
+            duplicateGroups.forEach(group => {
+                group.samples.forEach(sample => {
+                    if (sample.blobUrl) {
+                        URL.revokeObjectURL(sample.blobUrl);
+                    }
+                });
+            });
+        };
+    }, []);
 
     const toggleSelection = (path) => {
         setSelectedFiles(prev =>
@@ -175,6 +186,7 @@ const DuplicateManager = ({ duplicateGroups, onDelete }) => {
                             <div className="flex overflow-x-auto">
                                 {group.samples.map((file, fileIndex) => {
                                     const isSelected = selectedFiles.includes(file.path);
+                                    const imgSrc = file.blobUrl || '';
                                     return (
                                         <div
                                             key={file.path}
@@ -190,8 +202,8 @@ const DuplicateManager = ({ duplicateGroups, onDelete }) => {
                                                 onClick={() => toggleSelection(file.path)}
                                             >
                                                 <img
-                                                    src={`${API_BASE}/api/images?path=${encodeURIComponent(file.path)}`}
-                                                    alt={file.path.split('/').pop()}
+                                                    src={imgSrc}
+                                                    alt={file.name}
                                                     className={`w-full h-56 object-cover transition-all duration-200
                                                         ${isSelected ? 'opacity-40 scale-[0.98]' : 'group-hover:opacity-80'}
                                                     `}
@@ -241,7 +253,7 @@ const DuplicateManager = ({ duplicateGroups, onDelete }) => {
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        setZoomedImage(`${API_BASE}/api/images?path=${encodeURIComponent(file.path)}`);
+                                                        setZoomedImage(imgSrc);
                                                     }}
                                                     className="absolute top-3 right-3 bg-black/40 backdrop-blur-sm hover:bg-black/60 text-white rounded-lg p-2
                                                                opacity-0 group-hover:opacity-100 transition-all duration-200 border border-white/10"
@@ -255,7 +267,7 @@ const DuplicateManager = ({ duplicateGroups, onDelete }) => {
                                             {/* File info */}
                                             <div className={`px-4 py-3 border-t ${isSelected ? 'border-red-500/20 bg-red-500/5' : 'border-white/5'}`}>
                                                 <p className="text-xs font-medium text-zinc-300 truncate" title={file.path}>
-                                                    {file.path.split('/').pop()}
+                                                    {file.name}
                                                 </p>
                                                 <div className="flex items-center gap-4 mt-1.5">
                                                     <span className="text-[11px] text-zinc-600 flex items-center gap-1.5">
