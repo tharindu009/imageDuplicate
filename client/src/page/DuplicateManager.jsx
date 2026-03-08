@@ -72,7 +72,7 @@ const DuplicateManager = ({ duplicateGroups, onDelete }) => {
     }
 
     return (
-        <div className="max-w-[1600px] mx-auto px-6 py-8 pb-24 relative z-10">
+        <div className="max-w-[1600px] mx-auto px-8 py-8 pb-24 relative z-10">
             {/* Results Header */}
             <header className="mb-8 animate-fade-in-up">
                 <h2 className="text-2xl font-bold text-white mb-1">
