@@ -1,0 +1,13 @@
+{
+    "name": "duplicleaner",
+    "version": "1.0.0",
+    "description": "Find and remove duplicate images",
+    "scripts": {
+        "install:client": "cd client && npm install",
+        "install:server": "cd server && npm install",
+        "build": "cd client && npm run build",
+        "start": "cd server && node index.js",
+        "dev": "cd server && node --watch index.js",
+        "render-build": "npm run install:client && npm run install:server && npm run build"
+    }
+}
