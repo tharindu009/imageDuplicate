@@ -149,7 +149,7 @@ function App() {
                     disabled={loading}
                     style={{
                       width: '100%',
-                      padding: '20px 32px',
+                      padding: '22px 40px',
                       background: 'linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)',
                       border: 'none',
                       borderRadius: '16px',
@@ -246,63 +246,108 @@ function App() {
         <>
           {/* Compact Top Bar (when scanning/scanned) */}
           <div className="sticky top-[52px] z-20 glass-dark border-b border-white/5">
-            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '12px 32px' }}>
-              <div className="flex items-center gap-3">
-                {/* Folder info */}
-                <div className="flex items-center gap-2 flex-1">
-                  <svg className="h-4 w-4 text-violet-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-                  </svg>
-                  <span className="text-sm text-zinc-300 font-medium truncate">{folderName}</span>
+            <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '14px 32px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                {/* Folder info + stats */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <svg style={{ height: '16px', width: '16px', color: '#a78bfa', flexShrink: 0 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                    </svg>
+                    <span style={{ fontSize: '14px', color: '#d4d4d8', fontWeight: 600 }}>{folderName}</span>
+                  </div>
+
+                  {scanned && !loading && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <span style={{ fontSize: '12px', color: '#71717a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4ade80', display: 'inline-block' }} />
+                        <strong style={{ color: '#d4d4d8' }}>{totalImages}</strong> images
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#71717a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#a78bfa', display: 'inline-block' }} />
+                        <strong style={{ color: '#d4d4d8' }}>{duplicateGroups.length}</strong> groups
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Action buttons */}
-                <button
-                  onClick={handleRescan}
-                  disabled={loading}
-                  className="btn-primary px-5 py-2 rounded-xl text-white font-semibold text-sm
-                             disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                      Scanning...
-                    </>
-                  ) : (
-                    'Re-scan'
-                  )}
-                </button>
-                <button
-                  onClick={handleSelectAndScan}
-                  disabled={loading}
-                  className="text-sm text-zinc-500 hover:text-violet-400 font-medium px-4 py-2 rounded-xl
-                             hover:bg-white/5 transition disabled:opacity-40"
-                >
-                  Change Folder
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                  <button
+                    onClick={handleRescan}
+                    disabled={loading}
+                    style={{
+                      padding: '8px 20px',
+                      background: 'linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)',
+                      border: 'none',
+                      borderRadius: '10px',
+                      color: '#fff',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                      opacity: loading ? 0.4 : 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
+                    }}
+                  >
+                    {loading ? (
+                      <>
+                        <svg className="animate-spin" style={{ height: '14px', width: '14px' }} viewBox="0 0 24 24">
+                          <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Scanning...
+                      </>
+                    ) : (
+                      <>
+                        <svg style={{ height: '14px', width: '14px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Re-scan
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleSelectAndScan}
+                    disabled={loading}
+                    style={{
+                      padding: '8px 16px',
+                      background: 'transparent',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '10px',
+                      color: '#a1a1aa',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                      e.currentTarget.style.color = '#c4b5fd';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
+                      e.currentTarget.style.color = '#a1a1aa';
+                    }}
+                  >
+                    <svg style={{ height: '14px', width: '14px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                    </svg>
+                    Change Folder
+                  </button>
+                </div>
               </div>
 
               {/* Error */}
               {error && (
                 <div className="mt-2 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2 animate-fade-in">
                   {error}
-                </div>
-              )}
-
-              {/* Stats */}
-              {scanned && !loading && (
-                <div className="flex items-center gap-4 mt-2.5">
-                  <div className="flex items-center gap-2 text-xs text-zinc-500">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                    <span><strong className="text-zinc-300">{totalImages}</strong> images scanned</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-zinc-500">
-                    <div className="w-1.5 h-1.5 rounded-full bg-violet-400" />
-                    <span><strong className="text-zinc-300">{duplicateGroups.length}</strong> duplicate group{duplicateGroups.length !== 1 ? 's' : ''}</span>
-                  </div>
                 </div>
               )}
             </div>

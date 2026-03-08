@@ -72,9 +72,23 @@ const DuplicateManager = ({ duplicateGroups, onDelete }) => {
     }
 
     return (
-        <div className="max-w-[1600px] mx-auto px-8 py-8 pb-24 relative z-10">
+        <div className="max-w-[1600px] mx-auto py-8 pb-28 relative z-10" style={{ paddingLeft: '48px', paddingRight: '48px' }}>
             {/* Results Header */}
-            <header className="mb-8 animate-fade-in-up">
+            <header className="animate-fade-in-up" style={{
+                position: 'sticky',
+                top: '100px',
+                zIndex: 15,
+                background: 'rgba(10, 10, 15, 0.9)',
+                backdropFilter: 'blur(12px)',
+                paddingTop: '16px',
+                paddingBottom: '16px',
+                marginBottom: '16px',
+                marginLeft: '-16px',
+                marginRight: '-16px',
+                paddingLeft: '16px',
+                paddingRight: '16px',
+                borderRadius: '12px',
+            }}>
                 <h2 className="text-2xl font-bold text-white mb-1">
                     Side-by-Side Comparison
                 </h2>
@@ -86,57 +100,104 @@ const DuplicateManager = ({ duplicateGroups, onDelete }) => {
 
             {/* Floating Delete Bar */}
             <div
-                className={`fixed bottom-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out
-                    ${selectedFiles.length > 0 ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}
+                style={{
+                    position: 'fixed',
+                    bottom: selectedFiles.length > 0 ? '16px' : '-80px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    zIndex: 50,
+                    width: '100%',
+                    maxWidth: '680px',
+                    padding: '0 16px',
+                    transition: 'bottom 0.3s ease',
+                    pointerEvents: selectedFiles.length > 0 ? 'auto' : 'none',
+                }}
             >
-                <div className="glass-dark border-t border-white/10 shadow-[0_-8px_40px_rgba(0,0,0,0.4)]">
-                    <div className="max-w-[1600px] mx-auto px-6 py-3.5 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-red-500/15 flex items-center justify-center">
-                                <span className="text-sm font-bold text-red-400">{selectedFiles.length}</span>
-                            </div>
-                            <span className="text-sm text-zinc-400">
-                                file{selectedFiles.length !== 1 ? 's' : ''} marked for deletion
-                            </span>
+                <div style={{
+                    background: 'rgba(15, 15, 25, 0.92)',
+                    backdropFilter: 'blur(16px)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '16px',
+                    padding: '14px 24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                            width: '32px', height: '32px', borderRadius: '50%',
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                            <span style={{ fontSize: '14px', fontWeight: 700, color: '#f87171' }}>{selectedFiles.length}</span>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => setSelectedFiles([])}
-                                className="text-sm text-zinc-500 hover:text-zinc-300 font-medium px-4 py-2 rounded-lg
-                                           hover:bg-white/5 transition"
-                            >
-                                Clear All
-                            </button>
-                            <button
-                                onClick={handleDelete}
-                                className="btn-danger px-6 py-2.5 rounded-xl text-white font-semibold text-sm
-                                           disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-                                disabled={deleting}
-                            >
-                                {deleting ? (
-                                    <>
-                                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                        </svg>
-                                        Deleting...
-                                    </>
-                                ) : (
-                                    <>
-                                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                        Delete Selected
-                                    </>
-                                )}
-                            </button>
-                        </div>
+                        <span style={{ fontSize: '14px', color: '#a1a1aa' }}>
+                            file{selectedFiles.length !== 1 ? 's' : ''} marked
+                        </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
+                            onClick={() => setSelectedFiles([])}
+                            style={{
+                                padding: '8px 16px',
+                                background: 'transparent',
+                                border: '1px solid rgba(255,255,255,0.08)',
+                                borderRadius: '10px',
+                                color: '#71717a',
+                                fontSize: '13px',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = '#d4d4d8'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = '#71717a'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}
+                        >
+                            Clear All
+                        </button>
+                        <button
+                            onClick={handleDelete}
+                            disabled={deleting}
+                            style={{
+                                padding: '8px 20px',
+                                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                border: 'none',
+                                borderRadius: '10px',
+                                color: '#fff',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                cursor: deleting ? 'not-allowed' : 'pointer',
+                                opacity: deleting ? 0.5 : 1,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)',
+                                transition: 'all 0.2s ease',
+                            }}
+                        >
+                            {deleting ? (
+                                <>
+                                    <svg className="animate-spin" style={{ height: '14px', width: '14px' }} viewBox="0 0 24 24">
+                                        <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                        <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                    </svg>
+                                    Deleting...
+                                </>
+                            ) : (
+                                <>
+                                    <svg style={{ height: '14px', width: '14px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    Delete Selected
+                                </>
+                            )}
+                        </button>
                     </div>
                 </div>
             </div>
 
             {/* Duplicate Groups */}
-            <div className="space-y-6">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
                 {duplicateGroups.map((group, groupIndex) => {
                     const groupSelectedCount = group.samples.filter(f => selectedFiles.includes(f.path)).length;
                     return (
@@ -146,36 +207,71 @@ const DuplicateManager = ({ duplicateGroups, onDelete }) => {
                             style={{ animationDelay: `${groupIndex * 80}ms` }}
                         >
                             {/* Group Header */}
-                            <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/5">
-                                <div className="flex items-center gap-3">
-                                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg
-                                                     bg-violet-500/15 text-violet-400 text-xs font-bold">
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <span style={{
+                                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                        width: '28px', height: '28px', borderRadius: '8px',
+                                        background: 'rgba(139, 92, 246, 0.15)', color: '#a78bfa',
+                                        fontSize: '12px', fontWeight: 700,
+                                    }}>
                                         {groupIndex + 1}
                                     </span>
-                                    <span className="text-sm text-zinc-400">
-                                        <strong className="text-zinc-200">{group.samples.length}</strong> identical files
+                                    <span style={{ fontSize: '13px', color: '#a1a1aa' }}>
+                                        <strong style={{ color: '#e4e4e7' }}>{group.samples.length}</strong> identical files
                                     </span>
-                                    <span className="font-mono text-[11px] text-zinc-600 bg-white/5 px-2.5 py-0.5 rounded-md">
+                                    <span style={{
+                                        fontFamily: 'monospace', fontSize: '11px', color: '#52525b',
+                                        background: 'rgba(255,255,255,0.05)', padding: '2px 10px', borderRadius: '6px',
+                                    }}>
                                         {group.hash.substring(0, 12)}
                                     </span>
                                     {groupSelectedCount > 0 && (
-                                        <span className="text-[11px] text-red-400 bg-red-500/10 px-2.5 py-0.5 rounded-full font-medium">
+                                        <span style={{
+                                            fontSize: '11px', color: '#f87171',
+                                            background: 'rgba(239, 68, 68, 0.1)', padding: '3px 10px',
+                                            borderRadius: '20px', fontWeight: 500,
+                                        }}>
                                             {groupSelectedCount} marked
                                         </span>
                                     )}
                                 </div>
-                                <div className="flex items-center gap-1">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <button
                                         onClick={() => selectAllInGroup(group)}
-                                        className="text-xs text-violet-400 hover:text-violet-300 font-medium px-3 py-1.5 rounded-lg
-                                                   hover:bg-violet-500/10 transition"
+                                        style={{
+                                            fontSize: '12px', color: '#a78bfa', fontWeight: 500,
+                                            padding: '6px 14px', borderRadius: '8px', border: '1px solid rgba(139, 92, 246, 0.2)',
+                                            background: 'rgba(139, 92, 246, 0.08)', cursor: 'pointer',
+                                            transition: 'all 0.2s ease',
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)';
+                                            e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.35)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'rgba(139, 92, 246, 0.08)';
+                                            e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.2)';
+                                        }}
                                     >
                                         Select duplicates
                                     </button>
                                     <button
                                         onClick={() => deselectAllInGroup(group)}
-                                        className="text-xs text-zinc-600 hover:text-zinc-400 font-medium px-3 py-1.5 rounded-lg
-                                                   hover:bg-white/5 transition"
+                                        style={{
+                                            fontSize: '12px', color: '#71717a', fontWeight: 500,
+                                            padding: '6px 14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)',
+                                            background: 'transparent', cursor: 'pointer',
+                                            transition: 'all 0.2s ease',
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                                            e.currentTarget.style.color = '#a1a1aa';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'transparent';
+                                            e.currentTarget.style.color = '#71717a';
+                                        }}
                                     >
                                         Clear
                                     </button>
@@ -183,17 +279,16 @@ const DuplicateManager = ({ duplicateGroups, onDelete }) => {
                             </div>
 
                             {/* Side-by-side image row */}
-                            <div className="flex overflow-x-auto">
+                            <div style={{ display: 'flex', overflowX: 'auto', gap: '12px', padding: '12px' }}>
                                 {group.samples.map((file, fileIndex) => {
                                     const isSelected = selectedFiles.includes(file.path);
                                     const imgSrc = file.blobUrl || '';
                                     return (
                                         <div
                                             key={file.path}
-                                            className={`flex-shrink-0 flex flex-col transition-all duration-200 relative
+                                            className={`flex-shrink-0 flex flex-col transition-all duration-200 relative rounded-xl overflow-hidden
                                                 ${group.samples.length <= 3 ? 'flex-1 min-w-[280px]' : 'w-[320px]'}
-                                                ${fileIndex > 0 ? 'border-l border-white/5' : ''}
-                                                ${isSelected ? 'bg-red-500/5' : 'hover:bg-white/[0.02]'}
+                                                ${isSelected ? 'ring-2 ring-red-500/50 bg-red-500/5' : 'ring-1 ring-white/10 hover:ring-white/20'}
                                             `}
                                         >
                                             {/* Image */}
@@ -283,7 +378,7 @@ const DuplicateManager = ({ duplicateGroups, onDelete }) => {
                                                         {file.resolution}
                                                     </span>
                                                 </div>
-                                                <p className="text-[10px] text-zinc-700 truncate mt-1" title={file.path}>
+                                                <p className="text-[10px] text-zinc-500 truncate mt-1" title={file.path}>
                                                     {file.path}
                                                 </p>
                                             </div>
