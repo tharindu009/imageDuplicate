@@ -173,6 +173,95 @@ export async function scanForDuplicates(dirHandle, onProgress) {
 }
 
 /**
+ * Compare two folders to find matching images across them.
+ *
+ * @param {FileSystemDirectoryHandle} dirHandleA — first folder
+ * @param {FileSystemDirectoryHandle} dirHandleB — second folder
+ * @param {Function} onProgress — callback({ phase, count, total, current })
+ * @returns {{ duplicateGroups: Array, totalImages: number }}
+ */
+export async function compareFolders(dirHandleA, dirHandleB, onProgress) {
+    // Phase 1: Collect images from both folders
+    if (onProgress) onProgress({ phase: 'collecting', count: 0, folder: 'A' });
+    const filesA = await collectImageFiles(dirHandleA, dirHandleA.name, (p) => {
+        if (onProgress) onProgress({ ...p, folder: 'A' });
+    });
+
+    if (onProgress) onProgress({ phase: 'collecting', count: 0, folder: 'B' });
+    const filesB = await collectImageFiles(dirHandleB, dirHandleB.name, (p) => {
+        if (onProgress) onProgress({ ...p, folder: 'B' });
+    });
+
+    const allFiles = [
+        ...filesA.map(f => ({ ...f, folder: 'A', folderName: dirHandleA.name })),
+        ...filesB.map(f => ({ ...f, folder: 'B', folderName: dirHandleB.name })),
+    ];
+
+    if (allFiles.length === 0) {
+        return { duplicateGroups: [], totalImages: 0 };
+    }
+
+    // Phase 2: Hash all files
+    const hashMap = new Map();
+
+    for (let i = 0; i < allFiles.length; i++) {
+        const entry = allFiles[i];
+        if (onProgress) {
+            onProgress({
+                phase: 'hashing',
+                count: i + 1,
+                total: allFiles.length,
+                current: entry.name,
+            });
+        }
+
+        try {
+            const hash = await hashFile(entry.file);
+            if (!hashMap.has(hash)) {
+                hashMap.set(hash, []);
+            }
+            hashMap.get(hash).push(entry);
+        } catch (err) {
+            console.warn(`Failed to hash: ${entry.relativePath} — ${err.message}`);
+        }
+    }
+
+    // Phase 3: Build groups — only keep groups that have files from BOTH folders
+    const duplicateGroups = [];
+
+    for (const [hash, entries] of hashMap) {
+        const hasA = entries.some(e => e.folder === 'A');
+        const hasB = entries.some(e => e.folder === 'B');
+        if (!hasA || !hasB) continue; // skip if only in one folder
+
+        const samples = await Promise.all(
+            entries.map(async (entry) => {
+                const blob = new Blob([await entry.file.arrayBuffer()], { type: entry.file.type });
+                const blobUrl = URL.createObjectURL(blob);
+                const resolution = await getImageDimensions(blobUrl);
+
+                return {
+                    path: entry.relativePath,
+                    name: entry.name,
+                    size: formatFileSize(entry.file.size),
+                    sizeBytes: entry.file.size,
+                    resolution,
+                    blobUrl,
+                    handle: entry.handle,
+                    parentHandle: entry.parentHandle,
+                    folder: entry.folder,
+                    folderName: entry.folderName,
+                };
+            })
+        );
+
+        duplicateGroups.push({ hash, count: entries.length, samples });
+    }
+
+    return { duplicateGroups, totalImages: allFiles.length };
+}
+
+/**
  * Delete files using their File System Access API handles.
  *
  * @param {Array} filesToDelete — array of { handle, parentHandle, name, path }

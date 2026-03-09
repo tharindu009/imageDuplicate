@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const DuplicateManager = ({ duplicateGroups, onDelete }) => {
+const DuplicateManager = ({ duplicateGroups, onDelete, scanMode = 'single' }) => {
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [deleting, setDeleting] = useState(false);
     const [zoomedImage, setZoomedImage] = useState(null);
@@ -90,10 +90,10 @@ const DuplicateManager = ({ duplicateGroups, onDelete }) => {
                 borderRadius: '12px',
             }}>
                 <h2 className="text-2xl font-bold text-white mb-1">
-                    Side-by-Side Comparison
+                    {scanMode === 'compare' ? 'Cross-Folder Matches' : 'Side-by-Side Comparison'}
                 </h2>
                 <p className="text-sm text-zinc-500">
-                    {duplicateGroups.length} group{duplicateGroups.length !== 1 ? 's' : ''} found —
+                    {duplicateGroups.length} {scanMode === 'compare' ? 'matching group' : 'group'}{duplicateGroups.length !== 1 ? 's' : ''} found —
                     click images to mark for deletion
                 </p>
             </header>
@@ -328,20 +328,36 @@ const DuplicateManager = ({ duplicateGroups, onDelete }) => {
                                                     </div>
                                                 )}
 
-                                                {/* Original badge */}
-                                                {fileIndex === 0 && (
-                                                    <span className="absolute top-3 left-3 bg-emerald-500/90 backdrop-blur-sm text-white text-[10px]
-                                                                     font-bold px-2.5 py-1 rounded-lg shadow-lg shadow-emerald-500/20 uppercase tracking-wider">
-                                                        ★ Original
+                                                {/* Badge — folder label in compare mode, Original/Copy in single mode */}
+                                                {scanMode === 'compare' && file.folderName ? (
+                                                    <span style={{
+                                                        position: 'absolute', top: '12px', left: '12px',
+                                                        background: file.folder === 'A' ? 'rgba(59, 130, 246, 0.85)' : 'rgba(16, 185, 129, 0.85)',
+                                                        backdropFilter: 'blur(8px)',
+                                                        color: '#fff', fontSize: '10px', fontWeight: 700,
+                                                        padding: '4px 10px', borderRadius: '8px',
+                                                        textTransform: 'uppercase', letterSpacing: '0.05em',
+                                                        boxShadow: file.folder === 'A'
+                                                            ? '0 2px 8px rgba(59, 130, 246, 0.3)'
+                                                            : '0 2px 8px rgba(16, 185, 129, 0.3)',
+                                                    }}>
+                                                        📁 {file.folderName}
                                                     </span>
-                                                )}
-
-                                                {/* Duplicate badge */}
-                                                {fileIndex > 0 && (
-                                                    <span className="absolute top-3 left-3 bg-amber-500/80 backdrop-blur-sm text-white text-[10px]
-                                                                     font-bold px-2.5 py-1 rounded-lg shadow-lg uppercase tracking-wider">
-                                                        Copy {fileIndex}
-                                                    </span>
+                                                ) : (
+                                                    <>
+                                                        {fileIndex === 0 && (
+                                                            <span className="absolute top-3 left-3 bg-emerald-500/90 backdrop-blur-sm text-white text-[10px]
+                                                                             font-bold px-2.5 py-1 rounded-lg shadow-lg shadow-emerald-500/20 uppercase tracking-wider">
+                                                                ★ Original
+                                                            </span>
+                                                        )}
+                                                        {fileIndex > 0 && (
+                                                            <span className="absolute top-3 left-3 bg-amber-500/80 backdrop-blur-sm text-white text-[10px]
+                                                                             font-bold px-2.5 py-1 rounded-lg shadow-lg uppercase tracking-wider">
+                                                                Copy {fileIndex}
+                                                            </span>
+                                                        )}
+                                                    </>
                                                 )}
 
                                                 {/* Zoom */}

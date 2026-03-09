@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import './App.css'
 import DuplicateManager from './page/DuplicateManager'
-import { isFileSystemAccessSupported, pickDirectory, scanForDuplicates, deleteFiles } from './utils/fileScanner'
+import { isFileSystemAccessSupported, pickDirectory, scanForDuplicates, compareFolders, deleteFiles } from './utils/fileScanner'
 
 function App() {
   const [duplicateGroups, setDuplicateGroups] = useState([])
@@ -11,17 +11,23 @@ function App() {
   const [scanned, setScanned] = useState(false)
   const [folderName, setFolderName] = useState('')
   const [progress, setProgress] = useState(null)
+  const [scanMode, setScanMode] = useState('single') // 'single' or 'compare'
+  const [folderAName, setFolderAName] = useState('')
+  const [folderBName, setFolderBName] = useState('')
   const dirHandleRef = useRef(null)
+  const dirHandleARef = useRef(null)
+  const dirHandleBRef = useRef(null)
 
   const isSupported = isFileSystemAccessSupported()
 
+  // ─── Single Folder Scan ───
   const handleSelectAndScan = async () => {
     setError('')
     setProgress(null)
 
     try {
       const dirHandle = await pickDirectory()
-      if (!dirHandle) return // user cancelled
+      if (!dirHandle) return
 
       dirHandleRef.current = dirHandle
       setFolderName(dirHandle.name)
@@ -44,6 +50,28 @@ function App() {
   }
 
   const handleRescan = async () => {
+    if (scanMode === 'compare') {
+      if (!dirHandleARef.current || !dirHandleBRef.current) return
+      setLoading(true)
+      setError('')
+      setScanned(false)
+      setProgress(null)
+      try {
+        const result = await compareFolders(dirHandleARef.current, dirHandleBRef.current, (p) => {
+          setProgress(p)
+        })
+        setDuplicateGroups(result.duplicateGroups)
+        setTotalImages(result.totalImages)
+        setScanned(true)
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+        setProgress(null)
+      }
+      return
+    }
+
     if (!dirHandleRef.current) return
     setLoading(true)
     setError('')
@@ -65,8 +93,57 @@ function App() {
     }
   }
 
+  // ─── Compare Two Folders ───
+  const handleSelectFolderA = async () => {
+    try {
+      const h = await pickDirectory()
+      if (!h) return
+      dirHandleARef.current = h
+      setFolderAName(h.name)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const handleSelectFolderB = async () => {
+    try {
+      const h = await pickDirectory()
+      if (!h) return
+      dirHandleBRef.current = h
+      setFolderBName(h.name)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const handleCompare = async () => {
+    if (!dirHandleARef.current || !dirHandleBRef.current) {
+      setError('Please select both folders before comparing.')
+      return
+    }
+    setError('')
+    setProgress(null)
+    setLoading(true)
+    setScanned(false)
+    setFolderName(`${dirHandleARef.current.name} ↔ ${dirHandleBRef.current.name}`)
+
+    try {
+      const result = await compareFolders(dirHandleARef.current, dirHandleBRef.current, (p) => {
+        setProgress(p)
+      })
+      setDuplicateGroups(result.duplicateGroups)
+      setTotalImages(result.totalImages)
+      setScanned(true)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+      setProgress(null)
+    }
+  }
+
+  // ─── Delete ───
   const handleDelete = async (selectedFilePaths) => {
-    // Build file entries from duplicate groups matching paths
     const filesToDelete = []
     for (const group of duplicateGroups) {
       for (const sample of group.samples) {
@@ -89,6 +166,59 @@ function App() {
     return result
   }
 
+  // ─── Reset to home ───
+  const handleGoHome = () => {
+    setScanned(false)
+    setDuplicateGroups([])
+    setTotalImages(0)
+    setFolderName('')
+    setFolderAName('')
+    setFolderBName('')
+    setError('')
+    setProgress(null)
+    dirHandleRef.current = null
+    dirHandleARef.current = null
+    dirHandleBRef.current = null
+  }
+
+  // ─── Shared button style helpers ───
+  const primaryBtnStyle = {
+    padding: '22px 40px',
+    background: 'linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)',
+    border: 'none',
+    borderRadius: '16px',
+    color: '#fff',
+    fontSize: '16px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '12px',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 4px 20px rgba(124, 58, 237, 0.3)',
+    letterSpacing: '0.02em',
+    width: '100%',
+  }
+
+  const folderPickerBtnStyle = (isSelected) => ({
+    flex: 1,
+    padding: '18px 20px',
+    background: isSelected ? 'rgba(139, 92, 246, 0.08)' : 'rgba(255,255,255,0.03)',
+    border: isSelected ? '1.5px solid rgba(139, 92, 246, 0.3)' : '1.5px dashed rgba(255,255,255,0.12)',
+    borderRadius: '14px',
+    color: isSelected ? '#c4b5fd' : '#71717a',
+    fontSize: '14px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '8px',
+    minWidth: 0,
+  })
+
   return (
     <div className="min-h-screen bg-[#0a0a0f] bg-grid relative" style={{ overflowX: 'hidden' }}>
       {/* Ambient background glow */}
@@ -100,8 +230,7 @@ function App() {
       {/* Navigation */}
       <nav className="sticky top-0 z-30 glass-dark">
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '12px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div className="flex items-center gap-3">
-            {/* Logo */}
+          <div className="flex items-center gap-3" style={{ cursor: 'pointer' }} onClick={handleGoHome}>
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/20">
               <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -136,53 +265,195 @@ function App() {
               <span className="gradient-text">Duplicate Images</span>
             </h1>
 
-            <p className="text-zinc-400 text-lg leading-relaxed max-w-xl mx-auto" style={{ marginBottom: '56px' }}>
+            <p className="text-zinc-400 text-lg leading-relaxed max-w-xl mx-auto" style={{ marginBottom: '40px' }}>
               Scan any folder, compare duplicates side-by-side, and reclaim your storage. Fast, private, and runs entirely in your browser.
             </p>
 
-            {/* Select Folder Button */}
+            {/* Mode Toggle */}
             <div className="w-full max-w-2xl mx-auto">
               {isSupported ? (
-                <div className="relative" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <button
-                    onClick={handleSelectAndScan}
-                    disabled={loading}
-                    style={{
-                      width: '100%',
-                      padding: '22px 40px',
-                      background: 'linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)',
-                      border: 'none',
-                      borderRadius: '16px',
-                      color: '#fff',
-                      fontSize: '16px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '12px',
-                      transition: 'all 0.3s ease',
-                      boxShadow: '0 4px 20px rgba(124, 58, 237, 0.3)',
-                      letterSpacing: '0.02em',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 8px 30px rgba(124, 58, 237, 0.45)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 20px rgba(124, 58, 237, 0.3)';
-                    }}
-                  >
-                    <svg style={{ height: '20px', width: '20px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-                    </svg>
-                    Select Folder & Scan
-                  </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Toggle pills */}
+                  <div style={{
+                    display: 'flex',
+                    background: 'rgba(255,255,255,0.04)',
+                    borderRadius: '12px',
+                    padding: '4px',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                  }}>
+                    <button
+                      onClick={() => setScanMode('single')}
+                      style={{
+                        flex: 1,
+                        padding: '10px 16px',
+                        borderRadius: '9px',
+                        border: 'none',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        background: scanMode === 'single' ? 'linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)' : 'transparent',
+                        color: scanMode === 'single' ? '#fff' : '#71717a',
+                        boxShadow: scanMode === 'single' ? '0 2px 8px rgba(124, 58, 237, 0.3)' : 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                      }}
+                    >
+                      <svg style={{ height: '16px', width: '16px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                      </svg>
+                      Scan One Folder
+                    </button>
+                    <button
+                      onClick={() => setScanMode('compare')}
+                      style={{
+                        flex: 1,
+                        padding: '10px 16px',
+                        borderRadius: '9px',
+                        border: 'none',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        background: scanMode === 'compare' ? 'linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)' : 'transparent',
+                        color: scanMode === 'compare' ? '#fff' : '#71717a',
+                        boxShadow: scanMode === 'compare' ? '0 2px 8px rgba(124, 58, 237, 0.3)' : 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                      }}
+                    >
+                      <svg style={{ height: '16px', width: '16px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                      </svg>
+                      Compare Two Folders
+                    </button>
+                  </div>
 
-                  <p className="text-zinc-600 text-sm text-center">
-                    Your browser will ask you to pick a folder — no files are uploaded anywhere
-                  </p>
+                  {/* Single folder mode */}
+                  {scanMode === 'single' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <button
+                        onClick={handleSelectAndScan}
+                        disabled={loading}
+                        style={primaryBtnStyle}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = '0 8px 30px rgba(124, 58, 237, 0.45)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 4px 20px rgba(124, 58, 237, 0.3)';
+                        }}
+                      >
+                        <svg style={{ height: '20px', width: '20px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                        </svg>
+                        Select Folder & Scan
+                      </button>
+                      <p className="text-zinc-600 text-sm text-center">
+                        Find duplicates within a single folder
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Compare two folders mode */}
+                  {scanMode === 'compare' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {/* Folder selectors row */}
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'stretch' }}>
+                        <button
+                          onClick={handleSelectFolderA}
+                          style={folderPickerBtnStyle(!!folderAName)}
+                        >
+                          <svg style={{ height: '24px', width: '24px', opacity: folderAName ? 1 : 0.5 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                          </svg>
+                          {folderAName ? (
+                            <>
+                              <span style={{ fontSize: '13px', fontWeight: 600, color: '#e4e4e7' }}>{folderAName}</span>
+                              <span style={{ fontSize: '11px', color: '#4ade80' }}>✓ Selected</span>
+                            </>
+                          ) : (
+                            <span>Select Folder A</span>
+                          )}
+                        </button>
+
+                        {/* VS divider */}
+                        <div style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          flexShrink: 0, width: '40px',
+                        }}>
+                          <span style={{
+                            fontSize: '12px', fontWeight: 700, color: '#52525b',
+                            background: 'rgba(255,255,255,0.04)', padding: '6px 8px',
+                            borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)',
+                          }}>VS</span>
+                        </div>
+
+                        <button
+                          onClick={handleSelectFolderB}
+                          style={folderPickerBtnStyle(!!folderBName)}
+                        >
+                          <svg style={{ height: '24px', width: '24px', opacity: folderBName ? 1 : 0.5 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                          </svg>
+                          {folderBName ? (
+                            <>
+                              <span style={{ fontSize: '13px', fontWeight: 600, color: '#e4e4e7' }}>{folderBName}</span>
+                              <span style={{ fontSize: '11px', color: '#4ade80' }}>✓ Selected</span>
+                            </>
+                          ) : (
+                            <span>Select Folder B</span>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Compare button */}
+                      <button
+                        onClick={handleCompare}
+                        disabled={loading || !folderAName || !folderBName}
+                        style={{
+                          ...primaryBtnStyle,
+                          opacity: (!folderAName || !folderBName) ? 0.4 : 1,
+                          cursor: (!folderAName || !folderBName) ? 'not-allowed' : 'pointer',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (folderAName && folderBName) {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 8px 30px rgba(124, 58, 237, 0.45)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 4px 20px rgba(124, 58, 237, 0.3)';
+                        }}
+                      >
+                        <svg style={{ height: '20px', width: '20px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                        </svg>
+                        Compare Folders
+                      </button>
+                      <p className="text-zinc-600 text-sm text-center">
+                        Find matching images that exist in both folders
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Error */}
+                  {error && (
+                    <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 animate-fade-in">
+                      <div className="flex items-center gap-2">
+                        <svg className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                        </svg>
+                        {error}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* Unsupported browser fallback */
@@ -203,18 +474,6 @@ function App() {
                     The File System Access API is required for client-side scanning.<br />
                     Please use <strong style={{ color: '#fff' }}>Google Chrome</strong>, <strong style={{ color: '#fff' }}>Microsoft Edge</strong>, or <strong style={{ color: '#fff' }}>Opera</strong>.
                   </p>
-                </div>
-              )}
-
-              {/* Error */}
-              {error && (
-                <div className="mt-4 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 animate-fade-in">
-                  <div className="flex items-center gap-2">
-                    <svg className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-                    </svg>
-                    {error}
-                  </div>
                 </div>
               )}
             </div>
@@ -255,6 +514,13 @@ function App() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
                     </svg>
                     <span style={{ fontSize: '14px', color: '#d4d4d8', fontWeight: 600 }}>{folderName}</span>
+                    {scanMode === 'compare' && (
+                      <span style={{
+                        fontSize: '11px', fontWeight: 600, color: '#a78bfa',
+                        background: 'rgba(139, 92, 246, 0.12)', padding: '2px 8px',
+                        borderRadius: '6px', border: '1px solid rgba(139, 92, 246, 0.2)',
+                      }}>COMPARE</span>
+                    )}
                   </div>
 
                   {scanned && !loading && (
@@ -265,7 +531,7 @@ function App() {
                       </span>
                       <span style={{ fontSize: '12px', color: '#71717a', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#a78bfa', display: 'inline-block' }} />
-                        <strong style={{ color: '#d4d4d8' }}>{duplicateGroups.length}</strong> groups
+                        <strong style={{ color: '#d4d4d8' }}>{duplicateGroups.length}</strong> {scanMode === 'compare' ? 'matches' : 'groups'}
                       </span>
                     </div>
                   )}
@@ -311,7 +577,7 @@ function App() {
                     )}
                   </button>
                   <button
-                    onClick={handleSelectAndScan}
+                    onClick={handleGoHome}
                     disabled={loading}
                     style={{
                       padding: '8px 16px',
@@ -339,7 +605,7 @@ function App() {
                     <svg style={{ height: '14px', width: '14px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
                     </svg>
-                    Change Folder
+                    New Scan
                   </button>
                 </div>
               </div>
@@ -367,7 +633,9 @@ function App() {
 
               {progress && progress.phase === 'collecting' && (
                 <>
-                  <p className="text-zinc-400 mt-6 font-medium">Discovering images...</p>
+                  <p className="text-zinc-400 mt-6 font-medium">
+                    Discovering images{progress.folder ? ` in Folder ${progress.folder}` : ''}...
+                  </p>
                   <p className="text-zinc-600 text-sm mt-1">Found {progress.count} images so far</p>
                 </>
               )}
@@ -377,7 +645,6 @@ function App() {
                   <p className="text-zinc-600 text-sm mt-1">
                     {progress.count} / {progress.total} — {progress.current}
                   </p>
-                  {/* Progress bar */}
                   <div style={{
                     width: '240px', height: '4px', background: 'rgba(255,255,255,0.05)',
                     borderRadius: '4px', marginTop: '16px', overflow: 'hidden',
@@ -406,6 +673,7 @@ function App() {
             <DuplicateManager
               duplicateGroups={duplicateGroups}
               onDelete={handleDelete}
+              scanMode={scanMode}
             />
           )}
         </>
