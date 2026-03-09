@@ -407,6 +407,13 @@ const DuplicateManager = ({ duplicateGroups, onDelete, scanMode = 'single' }) =>
                 })}
             </div>
 
+            {/* Advertisement */}
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '32px' }}>
+                <a href='https://s.click.aliexpress.com/e/_c4dF3RSP?bz=725*90' target='_parent'>
+                    <img width='725' height='90' src='https://ae-pic-a1.aliexpress-media.com/kf/S4d974047acf24e1c83066e09c4f8c5adw.png' />
+                </a>
+            </div>
+
             {/* Zoom Modal */}
             {zoomedImage && (
                 <div
